@@ -1,0 +1,85 @@
+# Runs Skyline Snow's learning loop on GitHub's servers and publishes the app with GitHub Pages.
+#   every 3 hours: collect.py  (Mt. Bachelor sensors + forecast snapshots)
+#   once a day:    calibrate.py (re-learns calibration.json), in the 12:17 UTC run (4:17 / 5:17 am Pacific)
+# New data is committed back to this repository; `git pull` on your Mac brings it down.
+name: Update forecast data
+
+on:
+  schedule:
+    - cron: "17 */3 * * *"
+  workflow_dispatch:        # "Run workflow" button on GitHub, also runs calibrate
+  push:
+    branches: [main]
+    paths: ["snowline/index.html", ".github/workflows/**"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: snowline-update
+  cancel-in-progress: false
+
+env:
+  TZ: America/Los_Angeles   # so "today" and forecast lead times match the Mac and SNOTEL
+
+jobs:
+  update:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Collect resort sensors and forecast snapshot
+        id: collect
+        continue-on-error: true
+        run: python snowline/learn/collect.py
+
+      - name: Calibrate (daily run, or when started by hand)
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$(date -u +%H)" = "12" ]; then
+            python snowline/learn/calibrate.py
+          else
+            echo "Not the daily calibration run; skipping."
+          fi
+
+      - name: Save new data to the repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add snowline/data snowline/calibration.json
+          if git diff --cached --quiet; then
+            echo "No new data."
+          else
+            git commit -m "Data update $(date +'%Y-%m-%d %H:%M %Z')"
+            git pull --rebase
+            git push
+          fi
+
+      - name: Flag a collection problem
+        if: steps.collect.outcome == 'failure'
+        run: |
+          echo "::warning::collect.py reported a problem (see its step log). If Mt. Bachelor's feed refuses GitHub's servers, keep collecting it on the Mac."
+
+  deploy:
+    needs: update
+    if: always() && (needs.update.result == 'success' || needs.update.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: snowline
+      - id: pages
+        uses: actions/deploy-pages@v4
