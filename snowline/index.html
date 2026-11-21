@@ -88,13 +88,19 @@ h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance}
 .tile .big{font-family:var(--font-display);font-size:32px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
 .tile .big small{font-size:15px;color:var(--muted);font-weight:500;margin-left:3px}
 .tile .sub{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.tile .sub.models{display:flex;flex-wrap:wrap;align-content:flex-start;gap:0 9px;line-height:17px;min-height:34px}
+.tile .label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mv{white-space:nowrap;display:inline-flex;align-items:center;gap:4px;height:17px}
+.mv i{width:7px;height:7px;border-radius:50%;background:var(--c);flex:none}
+@media (max-width:820px){.mv .mn{display:none}}
+.tile .foot{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* panels */
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0}
 .panel-h{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .panel-h h2{font-size:17px}
 .scrollx{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend{display:flex;gap:14px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%;font-size:12px;color:var(--muted);white-space:nowrap}
 .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;background:var(--c);vertical-align:middle;margin-right:5px}
 
 /* outlook grid */
@@ -142,7 +148,9 @@ table.grid tr.band td{background:var(--sunk);text-align:left;font-family:var(--f
 .station{display:flex;gap:14px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}
 .station .depth{font-family:var(--font-display);font-size:28px;font-weight:600;line-height:1}
 .station .meta{font-size:12px;color:var(--muted);min-width:0}
+.station > div:first-child{flex:none;width:64px}
 .station svg{flex:none}
+@media (max-width:520px){.station svg{width:72px}}
 
 .note{font-size:12px;color:var(--muted);max-width:80ch}
 .status{padding:40px 0;text-align:center;color:var(--muted)}
@@ -651,13 +659,14 @@ function renderTiles(c){
   const n5 = sumDays(days,0,5), n16 = sumDays(days,5,16);
   const rng = (a,b) => {
     const vals = c.ids.map(id => ({id, v:sumDays(c.per[state.elev][id], a, b), cover:c.per[state.elev][id].length}));
-    return vals.filter(x => x.cover >= Math.min(b, 16) - 0.5 || a < x.cover).map(x => `${modelById(x.id).name} ${U.snow(x.v)}${x.cover < b ? '*' : ''}`).join(' · ');
+    return vals.filter(x => x.cover >= Math.min(b, 16) - 0.5 || a < x.cover).map(x => { const m = modelById(x.id);
+      return `<span class="mv" title="${m.name}: ${U.snow(x.v)}"><i style="--c:${m.color}"></i><span class="mn">${m.name}</span>${num(x.v)}${x.cover < b ? '*' : ''}</span>` }).join('');
   };
   const big = days.reduce((a,d)=> d.snow > (a?.snow ?? -1) ? d : a, null);
   let ensTxt = '';
   if(ens){
     const p = q => U.snow(pct(ens.totals, q));
-    ensTxt = `Ensemble 16-day: ${p(.1)}–${p(.9)} (median ${p(.5)}, ${ens.n} runs)`;
+    ensTxt = `<span title="Ensemble 16-day total: ${p(.1)} to ${p(.9)}, median ${p(.5)}, ${ens.n} runs">Ensemble 16-day ${p(.1)}–${p(.9)}</span>`;
   }
   const obs = current.obs?.[0];
   const depth = obs?.snwd?.length ? obs.snwd[obs.snwd.length-1] : null;
@@ -665,8 +674,8 @@ function renderTiles(c){
   const depthStr = depth ? (imp()? `${depth.value}<small>in</small>` : `${Math.round(depth.value*2.54)}<small>cm</small>`) : '–';
   const chg = depth && prev ? depth.value - prev.value : null;
   $('#tiles').innerHTML = `
-    <div class="tile"><span class="label">Next 5 days · ${ELEV_NAME[state.elev]}</span><span class="big">${num(n5)}<small>${U.snowUnit()}</small></span><span class="sub">${rng(0,5)}</span></div>
-    <div class="tile"><span class="label">Days 6–16</span><span class="big">${num(n16)}<small>${U.snowUnit()}</small></span><span class="sub">${ensTxt || rng(5,16) + (c.ids.some(id=>c.per[state.elev][id].length<16)?' <br>* model ends early':'')}</span></div>
+    <div class="tile"><span class="label">Next 5 days</span><span class="big">${num(n5)}<small>${U.snowUnit()}</small></span><span class="sub models">${rng(0,5)}</span><span class="foot">&nbsp;</span></div>
+    <div class="tile"><span class="label">Days 6–16</span><span class="big">${num(n16)}<small>${U.snowUnit()}</small></span><span class="sub models">${rng(5,16)}</span><span class="foot">${ensTxt || (c.ids.some(id=>c.per[state.elev][id].length<16) ? '* model ends early' : '&nbsp;')}</span></div>
     <div class="tile"><span class="label">Biggest day</span><span class="big">${big && big.snow>0.2 ? num(big.snow) + `<small>${U.snowUnit()}</small>` : '–'}</span><span class="sub">${big && big.snow>0.2 ? (()=>{const l=dayLabel(big.date, days.indexOf(big)); return `${l.wd} ${l.dm} (06:00 to 06:00)`})() : 'No snow in the forecast'}</span></div>
     <div class="tile"><span class="label">Snow depth now</span><span class="big">${depthStr}</span><span class="sub">${obs ? `${esc(obs.n)} SNOTEL, ${Math.round(obs.e).toLocaleString()} ft${chg!=null ? ` · ${chg>=0?'+':''}${imp()?chg:Math.round(chg*2.54)} ${imp()?'in':'cm'} in 24h`:''}` : (current.obs ? 'No SNOTEL station within 60 km' : 'Loading…')}</span></div>`;
 }
@@ -702,7 +711,7 @@ function outlookHTML(c){
       <div class="barv" style="bottom:calc(${top}% + 6px)">${U.snow(d.snow)}</div></div></div>`;
   }).join('');
   // rain
-  if(prim.some(d => d.rain >= 0.5)) html += `<div class="rl">Rain</div>` + prim.map((d,i)=>`<div class="cell${lowc(i)}"><span class="rainv">${U.rain(d.rain)}</span></div>`).join('');
+  html += `<div class="rl">Rain</div>` + prim.map((d,i)=>`<div class="cell${lowc(i)}"><span class="rainv">${U.rain(d.rain) || '&nbsp;'}</span></div>`).join('');
   // temps
   html += `<div class="rl">High / Low</div>` + prim.map((d,i)=>`<div class="cell${lowc(i)}"><div class="hi" style="color:${tempColor(d.tmax)}">${U.temp(d.tmax)}</div><div class="lo">${U.temp(d.tmin)}</div></div>`).join('');
   // wind
@@ -768,11 +777,12 @@ function tableHTML(c){
     <tr><th class="rh"></th>${prim.map((_,i)=>PARTS.map((p,k)=>`<th class="${cls(i,k)}">${p}</th>`).join('')).join('')}</tr></thead><tbody>`;
   c.ids.forEach(id => { h += blocksRow(`<span class="mdot" style="--c:${modelById(id).color}"></span>${modelById(id).name}`, c.per[ek][id], (b,i,p) => snowCell(b?.snow, cls(i,p))) });
   if(c.primKey === 'blend' && c.ids.length > 1) h += blocksRow(`<span class="mdot" style="--c:var(--m-blend)"></span>Blend`, prim, (b,i,p) => snowCell(b?.snow, cls(i,p)));
-  if(prim.some(d=>d.rain>=0.5)) h += blocksRow('Rain', prim, (b,i,p)=>`<td class="${cls(i,p)}"><span class="rainv">${b?U.rain(b.rain):''}</span></td>`);
+  h += blocksRow('Rain', prim, (b,i,p)=>`<td class="${cls(i,p)}"><span class="rainv">${(b && U.rain(b.rain)) || '&nbsp;'}</span></td>`);
   h += blocksRow('High', prim, (b,i,p)=>`<td class="${cls(i,p)}" style="font-weight:600;color:${tempColor(b?.tmax)}">${b?U.temp(b.tmax):''}</td>`);
   h += blocksRow('Low', prim, (b,i,p)=>`<td class="${cls(i,p)} muted">${b?U.temp(b.tmin):''}</td>`);
   h += blocksRow(`Wind <span class="muted" style="font-weight:400">${U.windUnit()}</span>`, prim, (b,i,p)=>`<td class="${cls(i,p)}">${b?windHTML(b.wind,b.dir):''}</td>`);
-  if(state.elev === 'base') h += blocksRow(`Gusts`, prim, (b,i,p)=>`<td class="${cls(i,p)} ${U.strongWind(b?.gust)?'strong':'muted'}">${b?.gust?U.wind(b.gust):''}</td>`);
+  // Gusts are only forecast at 10 m (base); keep the row at every elevation so the table doesn't jump.
+  h += blocksRow(`Gusts`, prim, (b,i,p)=>`<td class="${cls(i,p)} ${state.elev==='base' && U.strongWind(b?.gust)?'strong':'muted'}">${state.elev==='base' && b?.gust ? U.wind(b.gust) : (b ? '–' : '')}</td>`);
   h += blocksRow('Freezing lvl', prim, (b,i,p)=>`<td class="${cls(i,p)} muted" style="font-size:12px">${b?U.elevShort(b.fz):''}</td>`);
   h += `</tbody></table></div></div>`;
   return h;
@@ -789,7 +799,7 @@ function elevationsHTML(c){
     const days = c.per[ek][k];
     h += `<tr class="band"><td colspan="${prim.length+1}">${ELEV_NAME[ek]} · ${U.elev(current.r.elev[ek])}</td></tr>`;
     h += `<tr><td class="rh">Snow</td>${prim.map((_,i)=>snowCell(days[i]?.snow, cls(i))).join('')}</tr>`;
-    if(days.some(d=>d.rain>=0.5)) h += `<tr><td class="rh">Rain</td>${prim.map((_,i)=>`<td class="${cls(i)}"><span class="rainv">${U.rain(days[i]?.rain)}</span></td>`).join('')}</tr>`;
+    h += `<tr><td class="rh">Rain</td>${prim.map((_,i)=>`<td class="${cls(i)}"><span class="rainv">${U.rain(days[i]?.rain)}</span></td>`).join('')}</tr>`;
     h += `<tr><td class="rh">High / Low</td>${prim.map((_,i)=>{const d=days[i]; return `<td class="${cls(i)}">${d?`<b style="color:${tempColor(d.tmax)}">${U.temp(d.tmax)}</b> <span class="muted">${U.temp(d.tmin)}</span>`:''}</td>`}).join('')}</tr>`;
     h += `<tr><td class="rh">Wind <span class="muted" style="font-weight:400">${U.windUnit()}</span></td>${prim.map((_,i)=>`<td class="${cls(i)}">${days[i]?windHTML(days[i].wind, days[i].dir):''}</td>`).join('')}</tr>`;
   });
@@ -809,7 +819,7 @@ function renderObs(){
     let spark = '';
     if(v.length > 1){ const mx = Math.max(...v.map(a=>a.value), 4); const W=120, H=40;
       const pts = v.map((a,i)=>`${(i/(v.length-1)*W).toFixed(1)},${(H-2-(a.value/mx)*(H-6)).toFixed(1)}`).join(' ');
-      spark = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-label="14-day snow depth"><polyline points="0,${H} ${pts} ${W},${H}" fill="var(--snow0)" stroke="none"/><polyline points="${pts}" fill="none" stroke="var(--snow2)" stroke-width="2"/></svg>` }
+      spark = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="14-day snow depth"><polyline points="0,${H} ${pts} ${W},${H}" fill="var(--snow0)" stroke="none"/><polyline points="${pts}" fill="none" stroke="var(--snow2)" stroke-width="2"/></svg>` }
     return `<div class="station"><div><div class="depth">${last ? val(last.value) : '–'}<span class="muted" style="font-size:14px"> ${imp()?'in':'cm'}</span></div></div>
       <div class="meta" style="flex:1"><b style="color:var(--ink)">${esc(s.n)}</b><br>${U.elev(s.e/3.2808)} · ${Math.round(s.km)} km away<br>${last ? `As of ${last.date}` : 'No recent reading'}${swe!=null?` · SWE ${imp()?swe+' in':Math.round(swe*25.4)+' mm'}`:''}</div>${spark}</div>`;
   }).join('');
