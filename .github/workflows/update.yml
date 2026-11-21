@@ -82,6 +82,7 @@ jobs:
   # Separate job so GitHub has registered the uploaded site before deploy looks for it.
   deploy:
     needs: build-site
+    if: always() && needs.build-site.result == 'success'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
