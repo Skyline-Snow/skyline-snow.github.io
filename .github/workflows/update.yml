@@ -66,13 +66,10 @@ jobs:
         run: |
           echo "::warning::collect.py reported a problem (see its step log). If Mt. Bachelor's feed refuses GitHub's servers, keep collecting it on the Mac."
 
-  deploy:
+  build-site:
     needs: update
     if: always() && (needs.update.result == 'success' || needs.update.result == 'skipped')
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.pages.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -81,5 +78,14 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: snowline
+
+  # Separate job so GitHub has registered the uploaded site before deploy looks for it.
+  deploy:
+    needs: build-site
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
       - id: pages
         uses: actions/deploy-pages@v4
