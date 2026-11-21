@@ -187,6 +187,9 @@ dialog::backdrop{background:rgb(5 10 20 / .45)}
 
 /* phones: forecast straight after the heading, 7 days across the chart */
 @media (max-width:600px){
+  .topbar .in{gap:8px}
+  .brand{flex-basis:100%}
+  #resortSel{flex:1;min-width:0;max-width:none}
   .head{display:contents}
   .head > div:first-child{order:0;padding-top:14px}
   #view{display:contents}
@@ -217,7 +220,6 @@ dialog::backdrop{background:rgb(5 10 20 / .45)}
     </div>
     <label class="label" for="resortSel" style="position:absolute;left:-9999px">Resort</label>
     <select id="resortSel" class="sel" aria-label="Resort"></select>
-    <button id="favBtn" class="btn" type="button" title="Manage favourite resorts">★ Favourites</button>
     <div class="seg" role="group" aria-label="Units">
       <button type="button" data-units="imperial">in · °F</button>
       <button type="button" data-units="metric">cm · °C</button>
@@ -623,7 +625,8 @@ function renderChrome(){
   const sel = $('#resortSel');
   const favs = state.favorites.map(resortById).filter(Boolean);
   if(!favs.find(f => f.id === r.id)) favs.unshift(r);
-  sel.innerHTML = favs.map(f => `<option value="${esc(f.id)}"${f.id===r.id?' selected':''}>${esc(f.name)}</option>`).join('');
+  sel.innerHTML = favs.map(f => `<option value="${esc(f.id)}"${f.id===r.id?' selected':''}>${esc(f.name)}</option>`).join('') +
+    `<option disabled>──────────</option><option value="__manage">★ Manage</option>`;
   $('#resortName').textContent = r.name;
   $('#regionLine').textContent = r.region || '';
   $('#elevLine').innerHTML = ELEVS.map(k => `<span>${ELEV_NAME[k]} <b>${U.elev(r.elev[k])}</b></span>`).join('');
@@ -893,7 +896,9 @@ async function loadEnsemble(){
 }
 
 /* ---------- events ---------- */
-$('#resortSel').addEventListener('change', e => { state.resortId = e.target.value; save(); load(); loadResortLog() });
+$('#resortSel').addEventListener('change', e => {
+  if(e.target.value === '__manage'){ e.target.value = state.resortId; openFavs(); return }
+  state.resortId = e.target.value; save(); load(); loadResortLog() });
 document.querySelectorAll('[data-units]').forEach(b => b.addEventListener('click', () => { state.units = b.dataset.units; save(); render(); renderObs(); renderCalPanel(); loadResortLog() }));
 document.querySelectorAll('[data-elev]').forEach(b => b.addEventListener('click', () => { state.elev = b.dataset.elev; save(); current.ens = null; render(); loadEnsemble() }));
 document.querySelectorAll('[data-layout]').forEach(b => b.addEventListener('click', () => { state.layout = b.dataset.layout; save(); render() }));
@@ -973,7 +978,7 @@ function renderFavs(){
     <span>${esc(r.name)}<br><span class="muted" style="font-size:11px">${esc(r.region||'Custom')}</span></span>
     ${r.custom ? `<button type="button" class="rm" data-rm="${esc(r.id)}">Remove</button>` : ''}</label>`).join('');
 }
-$('#favBtn').addEventListener('click', () => { renderFavs(); renderChrome(); dlg.showModal() });
+function openFavs(){ renderFavs(); renderChrome(); dlg.showModal() }
 $('#favClose').addEventListener('click', () => dlg.close());
 dlg.addEventListener('close', () => { renderChrome() });
 $('#favList').addEventListener('change', e => { const id = e.target.dataset.fav; if(!id) return;
