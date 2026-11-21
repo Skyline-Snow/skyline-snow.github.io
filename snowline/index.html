@@ -145,6 +145,14 @@ table.grid td.d0,table.grid th.d0{border-left:1px solid var(--line)}
 table.grid td.sn{min-width:38px;font-weight:600;border-radius:0}
 table.grid td.lowc{opacity:.8}
 table.grid tr.band td{background:var(--sunk);text-align:left;font-family:var(--font-display);font-weight:600;font-size:13px;position:sticky;left:0}
+.caltab{min-width:520px}
+@media (max-width:600px){
+  table.grid.caltab{min-width:0;width:100%;table-layout:fixed}
+  table.grid.caltab th,table.grid.caltab td{white-space:normal;vertical-align:top;font-size:12px;padding:6px 4px}
+  table.grid.caltab th.rh,table.grid.caltab td.rh{position:static;width:26%;padding-right:6px}
+  table.grid.caltab th:nth-child(2){width:34%}
+  .caltab .win{display:none}
+}
 .mdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:6px}
 
 /* snotel */
@@ -908,7 +916,7 @@ function renderCalPanel(){
   const v = CAL.validation || {};
   const rows = Object.keys(BUCKET_LABEL).map(b => { const x = v[b]; if(!x) return '';
     return `<tr><td class="rh">${BUCKET_LABEL[b]}</td><td style="text-align:left">${CFG_LABEL[x.chosen] || x.chosen}</td>
-      <td>${imp() ? (x.raw_mae_mm/25.4).toFixed(2)+'″' : x.raw_mae_mm+' mm'}</td><td>${x.improvement_pct > 0 ? '−'+x.improvement_pct+'%' : 'no gain yet'}</td><td class="muted">${x.windows}</td></tr>` }).join('');
+      <td>${imp() ? (x.raw_mae_mm/25.4).toFixed(2)+'″' : x.raw_mae_mm+' mm'}</td><td>${x.improvement_pct > 0 ? '−'+x.improvement_pct+'%' : 'no gain yet'}</td><td class="muted win">${x.windows}</td></tr>` }).join('');
   const bias = CAL.raw_bias || {};
   const bname = {gfs_global:'GFS', ecmwf_ifs025:'ECMWF', gem_global:'GEM', icon_global:'ICON'};
   const biasTxt = Object.entries(bias).map(([m, o]) => { const v = o['1-2']; if(v == null) return '';
@@ -916,11 +924,11 @@ function renderCalPanel(){
   const ratios = (CAL.snow_ratio||[]).map(r => `<span class="chip" style="--c:var(--snow2);cursor:default">&lt;${imp()? r.max_f+'°F' : Math.round((r.max_f-32)*5/9)+'°C'} → ${r.ratio}:1${r.measured?'':' <span class="days">default</span>'}</span>`).join('');
   const rd = CAL.resort_depth || {};
   el.innerHTML = `<div class="panel-h"><h2>How this forecast is tuned</h2><span class="note">Learned ${esc(CAL.generated)} from ${CAL.days} days (${esc((CAL.seasons||[]).join(', '))}), checked against ${esc(CAL.target)}</span></div>
-    <div style="display:grid;gap:14px">
+    <div style="display:grid;grid-template-columns:minmax(0,1fr);gap:14px">
       <div><div class="label" style="margin-bottom:6px">Snow per inch of water ${calOn()?'(in use)':'(off)'}</div><div class="chips">${ratios}</div>
         <p class="note" style="margin:6px 0 0">Measured as settled depth gained per inch of water at the gauges. A storm board cleared each morning usually reads 20–30% more.</p></div>
       <div><div class="label" style="margin-bottom:6px">Precipitation correction, tested on a season it never saw</div>
-        <div class="scrollx"><table class="grid" style="min-width:520px"><thead><tr><th class="rh"></th><th style="text-align:left">Setting that won</th><th>Typical 3-day error</th><th>Improvement</th><th>Windows</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <div class="scrollx"><table class="grid caltab"><thead><tr><th class="rh"></th><th style="text-align:left">Setting that won</th><th>3-day error</th><th>Gain</th><th class="win">Windows</th></tr></thead><tbody>${rows}</tbody></table></div>
         <p class="note" style="margin:6px 0 0">Model wetness at the Bachelor stand-in, 1–2 days out: ${biasTxt}. Their errors largely cancel, so the plain average is hard to beat. A correction is only switched on once it beats it on a season it never saw.</p></div>
       <div><div class="label" style="margin-bottom:6px">Mt. Bachelor's own sensors</div>
         <p class="note" style="margin:0">${rd.days_logged ? `Logging since ${esc(rd.first)}: ${rd.days_logged} days, ${rd.snow_days} with at least 1″ of new depth at West Village.` : 'Not logged yet.'} ${esc(rd.note||'')}</p></div>
