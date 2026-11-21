@@ -25,6 +25,12 @@ bash learn/schedule.sh install
 
 `bash learn/schedule.sh status` checks it; `uninstall` removes it. Logs go to `data/logs/`.
 
+## Cloud and sync
+
+GitHub Actions (`.github/workflows/update.yml`) runs `collect.py` every 3 hours and `calibrate.py` daily, saves the data to this repository and publishes the app to https://skyline-snow.github.io.
+
+To keep a Mac copy current, `bash snowline/learn/autosync.sh install` pulls at login and daily at 07:00 (`status`, `now`, `uninstall` also work). The project must live outside Documents, Desktop and Downloads, which macOS blocks for background jobs.
+
 ## What is calibrated today
 
 - **Snow ratio:** measured near Bachelor (settled depth per inch of water by temperature). This is in use and is the biggest change from raw model snowfall.
