@@ -88,6 +88,12 @@ jobs:
         with:
           ref: main
       - uses: actions/configure-pages@v5
+      # Stamp the page with a fingerprint of its code so open copies can tell a newer version is live.
+      - name: Stamp app version
+        run: |
+          v=$(sha256sum snowline/index.html | cut -c1-10)
+          sed -i "s/__APP_VERSION__/$v/" snowline/index.html
+          printf '{"version":"%s"}\n' "$v" > snowline/version.json
       - uses: actions/upload-pages-artifact@v3
         with:
           path: snowline

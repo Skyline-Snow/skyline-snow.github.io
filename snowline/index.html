@@ -1046,6 +1046,23 @@ $('#addForm').addEventListener('submit', e => {
 loadCalibration();
 loadResortLog();
 load();
+
+/* Browsers (and iPhone home-screen apps) can keep showing an old copy of this page. When a newer
+   version is live, load it: checked on open and whenever the app comes back to the foreground. */
+const APP_VERSION = '__APP_VERSION__';
+async function checkForUpdate(){
+  if(APP_VERSION.startsWith('__')) return;   // local copy, not a published build
+  try{
+    const r = await fetch('version.json', {cache: 'no-store'}); if(!r.ok) return;
+    const {version} = await r.json();
+    if(version && version !== APP_VERSION && sessionStorage.getItem('reloadedFor') !== version){
+      sessionStorage.setItem('reloadedFor', version);
+      location.replace(location.pathname + '?v=' + version);   // new address skips the cached copy
+    }
+  }catch(e){}
+}
+checkForUpdate();
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') checkForUpdate() });
 </script>
 </body>
 </html>
