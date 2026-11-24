@@ -15,6 +15,7 @@ Then open http://localhost:8765.
 | Script | When | What it does |
 |---|---|---|
 | `learn/collect.py` | every 3 h | Logs Mt. Bachelor's own sensors (temperature, wind, West Village snow depth) to `data/mtb_hourly.csv`, which the resort only keeps for 24 h. Saves a snapshot of every model's forecast to `data/snapshots/`. |
+| `learn/verify.py` | every 3 h | Saves measured daily snowfall from the SNOTEL gauges to `data/observed/snotel_daily.csv` and West Village daily depth to `data/observed/resort_daily.csv`, then scores every saved forecast snapshot against what actually fell in `data/verification.csv`. |
 | `learn/calibrate.py` | daily | Re-fits corrections from SNOTEL measurements + archived and snapshot forecasts, tests each one on a season it never saw, and writes `calibration.json`. Appends results to `data/score_history.csv`. |
 
 Install the schedule (macOS):

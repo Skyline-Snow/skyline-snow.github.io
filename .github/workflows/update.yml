@@ -1,6 +1,7 @@
 # Runs Skyline Snow's learning loop on GitHub's servers and publishes the app with GitHub Pages.
 #   every 3 hours: collect.py  (Mt. Bachelor sensors + forecast snapshots)
-#   once a day:    calibrate.py (re-learns calibration.json), in the 12:17 UTC run (4:17 / 5:17 am Pacific)
+#   every 3 hours: verify.py   (saves measured SNOTEL snowfall, scores saved forecasts against it)
+#   once a day:    calibrate.py (re-learns calibration.json), in the first run of each Pacific day
 # New data is committed back to this repository; `git pull` on your Mac brings it down.
 name: Update forecast data
 
@@ -40,9 +41,16 @@ jobs:
         continue-on-error: true
         run: python snowline/learn/collect.py
 
-      - name: Calibrate (daily run, or when started by hand)
+      - name: Save measured snowfall and score saved forecasts against it
+        continue-on-error: true
+        run: cd snowline/learn && python verify.py
+
+      # GitHub often starts scheduled runs late, so run whenever today's calibration is missing
+      # rather than relying on a particular hour.
+      - name: Calibrate (first run each day, or when started by hand)
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$(date -u +%H)" = "12" ]; then
+          last=$(python -c "import json;print(json.load(open('snowline/calibration.json'))['generated'][:10])" 2>/dev/null || echo none)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$last" != "$(date +%F)" ]; then
             python snowline/learn/calibrate.py
           else
             echo "Not the daily calibration run; skipping."
