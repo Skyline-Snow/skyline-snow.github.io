@@ -708,6 +708,9 @@ function render(){
   $('#updated').innerHTML = `Model data fetched ${t.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}<br>${c.primKey==='blend' ? `Blend of ${c.ids.map(id=>modelById(id).name).join(', ')}` : modelById(c.primKey).name}`;
 }
 
+// Freezing level above the resort's base: rain is possible on the lower mountain, so flag it like strong wind.
+function fzClass(m){ return m != null && current?.r && m > current.r.elev.base ? 'strong' : 'muted' }
+
 function sumDays(days, a, b){ return days.slice(a, b).reduce((s,d)=>s+d.snow, 0) }
 
 function renderTiles(c){
@@ -775,7 +778,7 @@ function outlookHTML(c){
   html += `<div class="rl">Wind ${U.windUnit()}</div>` + prim.map((d,i)=>`<div class="cell${lowc(i)}">${windHTML(d.wind, d.dir)}</div>`).join('');
   // freezing level
   html += `<div class="rl">Freezing lvl</div>` + prim.map((d,i)=>{ const fz = d.blocks.filter(Boolean); const v = fz.reduce((a,b)=>a+b.fz,0)/fz.length;
-    return `<div class="cell${lowc(i)} muted" style="font-size:12px">${U.elevShort(v)}</div>` }).join('');
+    return `<div class="cell${lowc(i)} ${fzClass(v)}" style="font-size:12px">${U.elevShort(v)}</div>` }).join('');
   html += `</div></div></div>`;
   html += `<div class="panel cum"><div class="panel-h"><h2>Running total</h2><span class="note">How much snow each model has piled up by each day</span></div><div id="cumWrap"></div></div>`;
   return html;
@@ -840,7 +843,7 @@ function tableHTML(c){
   h += blocksRow(`Wind <span class="muted" style="font-weight:400">${U.windUnit()}</span>`, prim, (b,i,p)=>`<td class="${cls(i,p)}">${b?windHTML(b.wind,b.dir):''}</td>`);
   // Gusts are only forecast at 10 m (base); keep the row at every elevation so the table doesn't jump.
   h += blocksRow(`Gusts`, prim, (b,i,p)=>`<td class="${cls(i,p)} ${state.elev==='base' && U.strongWind(b?.gust)?'strong':'muted'}">${state.elev==='base' && b?.gust ? U.wind(b.gust) : (b ? '–' : '')}</td>`);
-  h += blocksRow('Freezing lvl', prim, (b,i,p)=>`<td class="${cls(i,p)} muted" style="font-size:12px">${b?U.elevShort(b.fz):''}</td>`);
+  h += blocksRow('Freezing lvl', prim, (b,i,p)=>`<td class="${cls(i,p)} ${b ? fzClass(b.fz) : 'muted'}" style="font-size:12px">${b?U.elevShort(b.fz):''}</td>`);
   h += `</tbody></table></div></div>`;
   return h;
 }
