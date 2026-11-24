@@ -67,9 +67,6 @@ h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance}
 .head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;padding-top:14px}
 .head h1{font-size:clamp(26px,4vw,38px);letter-spacing:-.02em;line-height:1.05}
 .region{margin-top:4px;color:var(--muted)}
-.elevline{display:flex;gap:6px;flex-wrap:nowrap;white-space:nowrap;margin-top:2px;color:var(--muted)}
-.elevline span + span::before{content:"·";margin-right:6px}
-.elevline b{color:var(--ink);font-weight:600}
 .updated{font-size:12px;color:var(--muted);text-align:right}
 
 /* controls */
@@ -104,6 +101,15 @@ h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance}
 .panel-h{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .panel-h h2{font-size:17px}
 .scrollx{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.modelbar{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.mb{border:0;background:none;padding:4px 0;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--ink)}
+.mb i{width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
+.mb.blend i{border-radius:2px;width:10px;height:10px;background:var(--snow2)}
+.mb.ens{color:var(--muted)} .mb.ens i{width:2px;height:12px;border-radius:0;background:var(--ink)}
+.mb.off{color:var(--muted);opacity:.45} .mb.off i{background:var(--muted)}
+.mb:disabled{opacity:.25;text-decoration:line-through;cursor:not-allowed}
+.elevbar{display:flex}
+.seg-full{width:100%;max-width:420px} .seg-full button{flex:1}
 .legend{display:flex;gap:14px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%;font-size:12px;color:var(--muted);white-space:nowrap}
 .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;background:var(--c);vertical-align:middle;margin-right:5px}
 
@@ -193,13 +199,24 @@ dialog::backdrop{background:rgb(5 10 20 / .45)}
   .head{display:contents}
   .head > div:first-child{order:0;padding-top:14px}
   #view{display:contents}
-  #view > :first-child{order:1}
-  .head .updated{order:2;text-align:left;margin-top:calc(-1 * var(--gap) + 6px)}
-  .controls{order:3}
-  #tiles{order:4}
-  #view > .cum{order:5}
-  .wrap > :nth-child(n+5){order:6}
-  .elevline{font-size:min(13px,3.45vw)}
+  #view > .panel:not(.cum){order:1}
+  .elevbar{order:2}
+  .head .updated{order:3;text-align:left;margin-top:calc(-1 * var(--gap) + 6px)}
+  .controls{order:4}
+  #tiles{order:5}
+  #view > .cum{order:6}
+  .wrap > :nth-child(n+6){order:7}
+  .seg-full{max-width:none}
+  .panel-h{margin-bottom:6px}
+  .panel-h h2{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .plot{height:122px;margin-top:20px}
+  .modelbar{flex-wrap:nowrap;justify-content:space-between;gap:8px;overflow-x:auto;scrollbar-width:none;margin-top:8px;padding-top:6px}
+  .mb{white-space:nowrap;gap:5px}
+  .head > div:first-child{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .head h1{font-size:28px}
+  .region{margin-top:0}
+  .og .dh{padding:2px 0 4px}
+  .og .cell{padding:5px 0}
   .panel{padding:12px}
   .og .rl{display:none}
   #view .scrollx{container-type:inline-size}
@@ -233,24 +250,11 @@ dialog::backdrop{background:rgb(5 10 20 / .45)}
     <div>
       <h1 id="resortName">Mt. Bachelor</h1>
       <div class="region" id="regionLine"></div>
-      <div class="elevline" id="elevLine"></div>
     </div>
     <div class="updated" id="updated"></div>
   </section>
 
   <section class="controls" aria-label="Forecast options">
-    <div class="ctl">
-      <span class="label">Weather models</span>
-      <div class="chips" id="modelChips"></div>
-    </div>
-    <div class="ctl">
-      <span class="label">Elevation</span>
-      <div class="seg" role="group" aria-label="Elevation" id="elevSeg">
-        <button type="button" data-elev="top">Summit</button>
-        <button type="button" data-elev="mid">Mid</button>
-        <button type="button" data-elev="base">Base</button>
-      </div>
-    </div>
     <div class="ctl">
       <span class="label">Layout</span>
       <div class="seg" role="group" aria-label="Layout" id="layoutSeg">
@@ -272,6 +276,14 @@ dialog::backdrop{background:rgb(5 10 20 / .45)}
   <section class="tiles" id="tiles" aria-label="Summary"></section>
 
   <section id="view"><div class="panel status">Loading forecast…</div></section>
+
+  <section class="elevbar" aria-label="Elevation">
+    <div class="seg seg-full" role="group" aria-label="Elevation" id="elevSeg">
+      <button type="button" data-elev="top">Summit</button>
+      <button type="button" data-elev="mid">Mid</button>
+      <button type="button" data-elev="base">Base</button>
+    </div>
+  </section>
 
   <section class="panel">
     <div class="panel-h"><h2>Snow on the ground</h2><span class="note">Nearest automated SNOTEL stations (USDA NRCS), daily readings</span></div>
@@ -629,7 +641,6 @@ function renderChrome(){
     `<option disabled>──────────</option><option value="__manage">★ Manage</option>`;
   $('#resortName').textContent = r.name;
   $('#regionLine').textContent = r.region || '';
-  $('#elevLine').innerHTML = ELEVS.map(k => `<span>${ELEV_NAME[k]} <b>${U.elev(r.elev[k])}</b></span>`).join('');
   document.querySelectorAll('[data-units]').forEach(b => b.setAttribute('aria-pressed', b.dataset.units === state.units));
   document.querySelectorAll('[data-elev]').forEach(b => b.setAttribute('aria-pressed', b.dataset.elev === state.elev));
   document.querySelectorAll('[data-layout]').forEach(b => b.setAttribute('aria-pressed', b.dataset.layout === state.layout));
@@ -639,16 +650,18 @@ function renderChrome(){
   document.querySelectorAll('.eu').forEach(e => e.textContent = imp() ? 'ft' : 'm');
 }
 
-function renderChips(data){
-  const el = $('#modelChips');
-  const avail = id => data ? data.series[state.elev][id].available : true;
-  const days = id => data ? Math.round(data.series[state.elev][id].days) : null;
-  el.innerHTML = MODELS.map(m => {
-    const on = state.models.includes(m.id) && avail(m.id);
-    const dis = !avail(m.id);
-    return `<button type="button" class="chip" style="--c:${m.color}" data-model="${m.id}" aria-pressed="${on}" ${dis?'disabled title="Not available for this location"':`title="${m.org}"`}>
-      <span class="dot"></span>${m.name}<span class="days">${dis? 'n/a' : days(m.id)!=null ? days(m.id)+'d' : ''}</span></button>`;
-  }).join('') + `<button type="button" class="chip" style="--c:var(--m-blend)" data-blend aria-pressed="${state.blend}" title="Average of the selected models"><span class="dot"></span>Blend</button>`;
+/* Model toggles: one row at the bottom of the main forecast box. A model that is off is greyed out. */
+function modelBarHTML(data, c){
+  const avail = id => data.series[state.elev][id]?.available;
+  const days = id => Math.round(data.series[state.elev][id]?.days || 0);
+  const items = MODELS.map(m => {
+    const on = state.models.includes(m.id) && avail(m.id), dis = !avail(m.id);
+    return `<button type="button" class="mb${on?'':' off'}" style="--c:${m.color}" data-model="${m.id}" aria-pressed="${on}" ${dis?'disabled':''}
+      title="${dis ? m.name+' is not available for this location' : `${m.org}, ${days(m.id)} days`}"><i></i>${m.name}</button>`;
+  }).join('');
+  const blend = `<button type="button" class="mb blend${state.blend?'':' off'}" data-blend aria-pressed="${state.blend}" title="Average of the selected models"><i></i>Blend</button>`;
+  const ens = current.ens && state.layout === 'outlook' ? `<span class="mb ens"><i></i>Ensemble 10–90%</span>` : '';
+  return `<div class="modelbar" id="modelChips" role="group" aria-label="Weather models">${blend}${items}${ens}</div>`;
 }
 
 /* ---------- render: main ---------- */
@@ -675,15 +688,15 @@ function compute(data){
 function render(){
   renderChrome();
   if(!current?.data){ return }
-  renderChips(current.data);
   const c = compute(current.data);
   current.c = c;
   renderTiles(c);
   const v = $('#view');
-  if(!c.ids.length){ v.innerHTML = `<div class="panel status">Select at least one model.</div>`; return }
+  if(!c.ids.length){ v.innerHTML = `<div class="panel"><div class="status">Select at least one model.</div>${modelBarHTML(current.data, c)}</div>`; return }
   if(state.layout === 'outlook') v.innerHTML = outlookHTML(c);
   else if(state.layout === 'table') v.innerHTML = tableHTML(c);
   else v.innerHTML = elevationsHTML(c);
+  v.querySelector('.panel')?.insertAdjacentHTML('beforeend', modelBarHTML(current.data, c));
   if(state.layout === 'outlook') drawCumulative(c);
   const t = new Date(current.data.at);
   $('#updated').innerHTML = `Model data fetched ${t.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}<br>${c.primKey==='blend' ? `Blend of ${c.ids.map(id=>modelById(id).name).join(', ')}` : modelById(c.primKey).name}`;
@@ -730,10 +743,7 @@ function outlookHTML(c){
   const h = v => clamp(v / max * 100, 0, 100);
   const lowc = i => i >= LOW_CONF_FROM ? ' low' : '';
   const showTicks = c.ids.length > 1 || c.primKey !== c.ids[0];
-  let html = `<div class="panel"><div class="panel-h"><h2>16-day snowfall · ${ELEV_NAME[ek]} (${U.elev(current.r.elev[ek])})</h2>
-    <div class="legend">${c.primKey==='blend'?`<span><i style="--c:var(--snow2);height:10px;width:10px"></i>Blend</span>`:''}
-    ${showTicks ? c.ids.map(id=>`<span><i style="--c:${modelById(id).color};width:9px;height:9px;border-radius:50%"></i>${modelById(id).name}</span>`).join('') : ''}
-    ${ens ? `<span><i style="--c:var(--ink);width:2px;height:12px"></i>Ensemble 10–90%</span>` : ''}</div></div>
+  let html = `<div class="panel"><div class="panel-h"><h2>16-day snowfall · ${ELEV_NAME[ek]} (${U.elev(current.r.elev[ek])})</h2></div>
     <div class="scrollx"><div class="og" style="--n:${n}">`;
   // header
   html += `<div class="rl"></div>` + prim.map((d,i) => { const l = dayLabel(d.date, i); return `<div class="dh${lowc(i)}"><b>${l.wd}</b>${l.dm}</div>` }).join('');
@@ -962,8 +972,8 @@ async function loadResortLog(){
     el.innerHTML = cards ? `<div class="label" style="margin-bottom:8px">Mt. Bachelor's own sensors</div><div class="obs">${cards}</div>` : '';
   }catch(e){ el.innerHTML = `<p class="note">Mt. Bachelor's own sensors appear here once <code>learn/collect.py</code> has run.</p>` }
 }
-$('#modelChips').addEventListener('click', e => {
-  const b = e.target.closest('button'); if(!b || b.disabled) return;
+$('#view').addEventListener('click', e => {
+  const b = e.target.closest('.modelbar button'); if(!b || b.disabled) return;
   if(b.hasAttribute('data-blend')){ state.blend = !state.blend }
   else { const id = b.dataset.model; state.models = state.models.includes(id) ? state.models.filter(x => x !== id) : [...state.models, id];
     if(!state.models.length) state.models = [id] }
