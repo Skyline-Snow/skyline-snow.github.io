@@ -412,7 +412,7 @@ def main():
             "Snow ratios are settled depth gained per unit of water; a cleared storm board usually shows more.",
             "Days 8-16 reuse the day 5-7 setting; they have not been verified.",
             "NBM has no forecast archive yet, so it gets the average correction of the other models.",
-            "A correction is only switched on for a lead time if it beat the uncorrected blend on a season it was not trained on.",
+            "A correction is used only if it beats the plain average on a season left out of its training.",
         ],
     }
     write_json(ROOT / "calibration.json", cal)
