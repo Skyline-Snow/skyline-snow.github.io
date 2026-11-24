@@ -285,9 +285,10 @@ dialog::backdrop{background:rgb(5 10 20 / .45)}
   </section>
 
   <section class="panel">
-    <div class="panel-h"><h2>Snow on the ground</h2><span class="note">Nearest automated SNOTEL stations (USDA NRCS), daily readings</span></div>
+    <div class="panel-h"><h2>Snow on the ground</h2></div>
+    <div id="resortObs"></div>
+    <div class="label" style="margin-bottom:8px" title="Nearest automated USDA NRCS SNOTEL stations, daily readings">SNOTEL</div>
     <div class="obs" id="obs"><div class="muted">Finding nearby stations…</div></div>
-    <div id="resortObs" style="margin-top:var(--gap)"></div>
   </section>
 
   <section class="panel" id="calPanel" hidden></section>
@@ -988,7 +989,7 @@ async function loadResortLog(){
         <div class="meta" style="flex:1"><b style="color:var(--ink)">${esc(s)}</b> · ${U.elev(o.elev_ft/3.2808)}<br>
         ${depth != null ? `Snow depth ${imp()? depth.toFixed(1)+'″' : Math.round(depth*2.54)+' cm'} · ` : ''}${wind>0 ? `Wind ${imp()? Math.round(wind) : Math.round(wind*1.609)} ${U.windUnit()}, gusts ${imp()? Math.round(gust) : Math.round(gust*1.609)}` : 'Calm'}<br>
         ${stale ? 'Not reporting since ' : ''}${esc(o.time_local.replace('T',' '))}</div></div>` }).join('');
-    el.innerHTML = cards ? `<div class="label" style="margin-bottom:8px">Mt. Bachelor's own sensors</div><div class="obs">${cards}</div>` : '';
+    el.innerHTML = cards ? `<div class="label" style="margin-bottom:8px">Mt. Bachelor</div><div class="obs" style="margin-bottom:var(--gap)">${cards}</div>` : '';
   }catch(e){ el.innerHTML = `<p class="note">Mt. Bachelor's own sensors appear here once <code>learn/collect.py</code> has run.</p>` }
 }
 $('#view').addEventListener('click', e => {
