@@ -105,7 +105,6 @@ h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance}
 .mb{border:0;background:none;padding:4px 0;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--ink)}
 .mb i{width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
 .mb.blend i{border-radius:2px;width:10px;height:10px;background:var(--snow2)}
-.mb.ens{color:var(--muted)} .mb.ens i{width:2px;height:12px;border-radius:0;background:var(--ink)}
 .mb.off{color:var(--muted);opacity:.45} .mb.off i{background:var(--muted)}
 .mb:disabled{opacity:.25;text-decoration:line-through;cursor:not-allowed}
 .elevbar{display:flex}
@@ -660,8 +659,7 @@ function modelBarHTML(data, c){
       title="${dis ? m.name+' is not available for this location' : `${m.org}, ${days(m.id)} days`}"><i></i>${m.name}</button>`;
   }).join('');
   const blend = `<button type="button" class="mb blend${state.blend?'':' off'}" data-blend aria-pressed="${state.blend}" title="Average of the selected models"><i></i>Blend</button>`;
-  const ens = current.ens && state.layout === 'outlook' ? `<span class="mb ens"><i></i>Ensemble 10–90%</span>` : '';
-  return `<div class="modelbar" id="modelChips" role="group" aria-label="Weather models">${blend}${items}${ens}</div>`;
+  return `<div class="modelbar" id="modelChips" role="group" aria-label="Weather models">${blend}${items}</div>`;
 }
 
 /* ---------- render: main ---------- */
