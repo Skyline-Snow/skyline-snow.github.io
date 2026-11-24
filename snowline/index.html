@@ -107,7 +107,7 @@ h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance}
 .mb.blend i{border-radius:2px;width:10px;height:10px;background:var(--snow2)}
 .mb.off{color:var(--muted);opacity:.45} .mb.off i{background:var(--muted)}
 .mb:disabled{opacity:.25;text-decoration:line-through;cursor:not-allowed}
-.elevbar{display:flex}
+.elevbar{display:flex} .elevbar[hidden]{display:none}
 .seg-full{width:100%;max-width:420px} .seg-full button{flex:1}
 .legend{display:flex;gap:14px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%;font-size:12px;color:var(--muted);white-space:nowrap}
 .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;background:var(--c);vertical-align:middle;margin-right:5px}
@@ -643,6 +643,7 @@ function renderChrome(){
   document.querySelectorAll('[data-units]').forEach(b => b.setAttribute('aria-pressed', b.dataset.units === state.units));
   document.querySelectorAll('[data-elev]').forEach(b => b.setAttribute('aria-pressed', b.dataset.elev === state.elev));
   document.querySelectorAll('[data-layout]').forEach(b => b.setAttribute('aria-pressed', b.dataset.layout === state.layout));
+  $('.elevbar').hidden = state.layout === 'elevations';
   $('#ensToggle').checked = state.ensemble;
   $('#calToggle').checked = calOn(); $('#calToggle').disabled = !CAL;
   $('#calToggle').parentElement.title = CAL ? `Trained through ${CAL.trained_through}` : 'No calibration.json yet. Run learn/calibrate.py.';
@@ -683,6 +684,7 @@ function compute(data){
   return {ids, per, primKey};
 }
 
+let lastLayout = null;
 function render(){
   renderChrome();
   if(!current?.data){ return }
@@ -690,11 +692,16 @@ function render(){
   current.c = c;
   renderTiles(c);
   const v = $('#view');
+  // Keep each sideways-scrolling area where the viewer left it when the same view re-renders
+  // (ensemble, elevation, model or unit changes). A new layout or resort starts at today.
+  const keep = lastLayout === state.layout + '|' + current.r.id ? [...v.querySelectorAll('.scrollx')].map(e => e.scrollLeft) : [];
+  lastLayout = state.layout + '|' + current.r.id;
   if(!c.ids.length){ v.innerHTML = `<div class="panel"><div class="status">Select at least one model.</div>${modelBarHTML(current.data, c)}</div>`; return }
   if(state.layout === 'outlook') v.innerHTML = outlookHTML(c);
   else if(state.layout === 'table') v.innerHTML = tableHTML(c);
   else v.innerHTML = elevationsHTML(c);
   v.querySelector('.panel')?.insertAdjacentHTML('beforeend', modelBarHTML(current.data, c));
+  v.querySelectorAll('.scrollx').forEach((e, i) => { if(keep[i]) e.scrollLeft = keep[i] });
   if(state.layout === 'outlook') drawCumulative(c);
   const t = new Date(current.data.at);
   $('#updated').innerHTML = `Model data fetched ${t.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}<br>${c.primKey==='blend' ? `Blend of ${c.ids.map(id=>modelById(id).name).join(', ')}` : modelById(c.primKey).name}`;
@@ -726,7 +733,10 @@ function renderTiles(c){
     <div class="tile"><span class="label">Next 5 days</span><span class="big">${num(n5)}<small>${U.snowUnit()}</small></span><span class="sub models">${rng(0,5)}</span><span class="foot">&nbsp;</span></div>
     <div class="tile"><span class="label">Days 6–16</span><span class="big">${num(n16)}<small>${U.snowUnit()}</small></span><span class="sub models">${rng(5,16)}</span><span class="foot">${ensTxt || (c.ids.some(id=>c.per[state.elev][id].length<16) ? '* model ends early' : '&nbsp;')}</span></div>
     <div class="tile"><span class="label">Biggest day</span><span class="big">${big && big.snow>0.2 ? num(big.snow) + `<small>${U.snowUnit()}</small>` : '–'}</span><span class="sub">${big && big.snow>0.2 ? (()=>{const l=dayLabel(big.date, days.indexOf(big)); return `${l.wd} ${l.dm} (06:00 to 06:00)`})() : 'No snow in the forecast'}</span></div>
-    <div class="tile"><span class="label">Snow depth now</span><span class="big">${depthStr}</span><span class="sub">${obs ? `${esc(obs.n)} SNOTEL, ${Math.round(obs.e).toLocaleString()} ft${chg!=null ? ` · ${chg>=0?'+':''}${imp()?chg:Math.round(chg*2.54)} ${imp()?'in':'cm'} in 24h`:''}` : (current.obs ? 'No SNOTEL station within 60 km' : 'Loading…')}</span></div>`;
+    ${state.resortId === 'bachelor' && resortDepth ? (() => { const d = resortDepth, ch = d.change;
+      const when = new Date(d.time).toLocaleString('en-US', {weekday:'short', hour:'numeric', minute:'2-digit'});
+      return `<div class="tile"><span class="label">Snow depth now</span><span class="big">${imp() ? num(d.depth*2.54) + '<small>in</small>' : Math.round(d.depth*2.54) + '<small>cm</small>'}</span><span class="sub">West Village sensor, 6,300 ft${ch!=null ? ` · ${ch>=0?'+':'−'}${imp() ? Math.abs(ch).toFixed(1)+'″' : Math.round(Math.abs(ch)*2.54)+' cm'} in 24h` : ''} · ${esc(when)}</span></div>` })() :
+    `<div class="tile"><span class="label">Snow depth now</span><span class="big">${depthStr}</span><span class="sub">${obs ? `${esc(obs.n)} SNOTEL, ${Math.round(obs.e).toLocaleString()} ft${chg!=null ? ` · ${chg>=0?'+':''}${imp()?chg:Math.round(chg*2.54)} ${imp()?'in':'cm'} in 24h`:''}` : (current.obs ? 'No SNOTEL station within 60 km' : 'Loading…')}</span></div>`}`;
 }
 function num(cm){ const v = U.snowNum(cm); return imp() ? (v < 10 ? v.toFixed(1) : Math.round(v)) : Math.round(v) }
 
@@ -909,7 +919,7 @@ $('#resortSel').addEventListener('change', e => {
   state.resortId = e.target.value; save(); load(); loadResortLog() });
 document.querySelectorAll('[data-units]').forEach(b => b.addEventListener('click', () => { state.units = b.dataset.units; save(); render(); renderObs(); renderCalPanel(); loadResortLog() }));
 document.querySelectorAll('[data-elev]').forEach(b => b.addEventListener('click', () => { state.elev = b.dataset.elev; save(); current.ens = null; render(); loadEnsemble() }));
-document.querySelectorAll('[data-layout]').forEach(b => b.addEventListener('click', () => { state.layout = b.dataset.layout; save(); render() }));
+document.querySelectorAll('[data-layout]').forEach(b => b.addEventListener('click', () => { state.layout = b.dataset.layout; save(); render(); window.scrollTo({top: 0}) }));
 $('#ensToggle').addEventListener('change', e => { state.ensemble = e.target.checked; save(); if(!state.ensemble){ current.ens = null; render() } else loadEnsemble() });
 $('#refreshBtn').addEventListener('click', () => { cache.ens = {}; load(true); loadCalibration(); loadResortLog() });
 $('#calToggle').addEventListener('change', e => { state.calibrated = e.target.checked; save(); current.ens = null; render(); renderCalPanel(); loadEnsemble() });
@@ -949,13 +959,24 @@ function renderCalPanel(){
       <ul class="note" style="margin:0;padding-left:18px">${(CAL.caveats||[]).map(c=>`<li>${esc(c)}</li>`).join('')}</ul>
     </div>`;
 }
+let resortDepth = null;
 async function loadResortLog(){
   const el = $('#resortObs');
-  if(state.resortId !== 'bachelor'){ el.innerHTML = ''; return }
+  if(state.resortId !== 'bachelor'){ el.innerHTML = ''; resortDepth = null; return }
   try{
     const r = await fetch('data/mtb_hourly.csv', {cache:'no-store'}); if(!r.ok) throw 0;
     const lines = (await r.text()).trim().split(/\r?\n/); const hdr = lines.shift().split(',');
     const latest = {};
+    // West Village snow depth for the "Snow depth now" tile: newest reading and the one ~24 h before it.
+    const wv = lines.map(l => { const v = l.split(','); return Object.fromEntries(hdr.map((h,i)=>[h, v[i]])) })
+      .filter(o => o.station === 'West Village' && o.depth_in !== '' && o.depth_in !== 'None' && !isNaN(+o.depth_in))
+      .sort((a,b) => a.time_local < b.time_local ? -1 : 1);
+    if(wv.length){
+      const last = wv[wv.length-1], t24 = new Date(new Date(last.time_local).getTime() - 24*3600e3).toISOString().slice(0,16);
+      const prior = [...wv].reverse().find(o => o.time_local <= t24);
+      resortDepth = {depth: +last.depth_in, time: last.time_local, change: prior ? +last.depth_in - +prior.depth_in : null};
+    }
+    if(current?.c) renderTiles(current.c);
     lines.forEach(l => { const v = l.split(','); const o = Object.fromEntries(hdr.map((h,i)=>[h, v[i]]));
       if(o.temp_f === '' || o.temp_f === 'None') return;
       if(!latest[o.station] || o.time_local > latest[o.station].time_local) latest[o.station] = o });
