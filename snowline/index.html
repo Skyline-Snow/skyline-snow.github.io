@@ -784,7 +784,7 @@ function outlookHTML(c){
   return html;
 }
 
-function tempColor(c){ if(c == null) return 'inherit'; if(c <= -1) return `color-mix(in oklab, var(--cold) ${clamp(40 + (-c)*6, 40, 100)}%, var(--ink))`; if(c >= 2) return `color-mix(in oklab, var(--warm) ${clamp(40 + c*6, 40, 100)}%, var(--ink))`; return 'var(--ink)' }
+function tempColor(c){ if(c == null) return 'inherit'; if(c <= -1) return `color-mix(in oklab, var(--cold) ${clamp(40 + (-c)*6, 40, 100)}%, var(--ink))`; if(imp() ? Math.round(c*9/5+32) > 32 : Math.round(c) > 0) return 'var(--warnwind)'; return 'var(--ink)' }   // above freezing: same orange as strong wind and high freezing levels
 function windHTML(w, d){ if(w == null) return '–'; const strong = U.strongWind(w);
   return `<span class="wind${strong?' strong':''}"><span class="arrow" style="transform:rotate(${Math.round(d ?? 0)}deg)" title="From ${Math.round(d ?? 0)}°">↓</span>${U.wind(w)}</span>` }
 
