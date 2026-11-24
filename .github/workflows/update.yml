@@ -1,6 +1,7 @@
 # Runs Skyline Snow's learning loop on GitHub's servers and publishes the app with GitHub Pages.
 #   every 3 hours: collect.py  (Mt. Bachelor sensors + forecast snapshots)
 #   every 3 hours: verify.py   (saves measured SNOTEL snowfall, scores saved forecasts against it)
+#   each morning:  stake_photo.py (one snow-stake webcam photo, last 7 days kept on the stake-photos branch)
 #   once a day:    calibrate.py (re-learns calibration.json), in the first run of each Pacific day
 # New data is committed back to this repository; `git pull` on your Mac brings it down.
 name: Update forecast data
@@ -40,6 +41,10 @@ jobs:
         id: collect
         continue-on-error: true
         run: python snowline/learn/collect.py
+
+      - name: Save the morning snow-stake photo (last 7 days kept on the stake-photos branch)
+        continue-on-error: true
+        run: cd snowline/learn && python stake_photo.py ${{ github.event_name == 'workflow_dispatch' && '--force' || '' }}
 
       - name: Save measured snowfall and score saved forecasts against it
         continue-on-error: true
