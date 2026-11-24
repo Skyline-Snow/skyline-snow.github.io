@@ -953,7 +953,7 @@ function renderCalPanel(){
         <p class="note" style="margin:6px 0 0">Measured as settled depth gained per inch of water at the gauges. A storm board cleared each morning usually reads 20–30% more.</p></div>
       <div><div class="label" style="margin-bottom:6px">Precipitation correction</div>
         <div class="scrollx"><table class="grid caltab"><thead><tr><th class="rh"></th><th style="text-align:left">Setting that won</th><th>3-day error</th><th>Gain</th><th class="win">Windows</th></tr></thead><tbody>${rows}</tbody></table></div>
-        <p class="note" style="margin:6px 0 0">Model wetness at the Bachelor stand-in, 1–2 days out: ${biasTxt}. Their errors largely cancel, so the plain average is hard to beat. Each correction is learned on all but one season, then tested on the season left out. It's used only if it beats the plain average there.</p></div>
+        <p class="note" style="margin:6px 0 0">Model wetness at the Bachelor stand-in, 1–2 days out: ${biasTxt}. Their errors largely cancel, so the plain average is hard to beat. Each correction is learned on all but one season, then tested on the season left out of its training. It's used only if it beats the plain average there.</p></div>
       <div><div class="label" style="margin-bottom:6px">Mt. Bachelor's own sensors</div>
         <p class="note" style="margin:0">${rd.days_logged ? `Logging since ${esc(rd.first)}: ${rd.days_logged} days, ${rd.snow_days} with at least 1″ of new depth at West Village.` : 'Not logged yet.'} ${esc(rd.note||'')}</p></div>
       ${CAL.excluded_leads?.length ? `<p class="note" style="margin:0">Left out of training: ${esc(CAL.excluded_leads.join(', '))} (the public archive undercounts these; collect.py's own snapshots will fill the gap).</p>` : ''}
