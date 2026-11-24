@@ -14,7 +14,7 @@ Then open http://localhost:8765.
 
 | Script | When | What it does |
 |---|---|---|
-| `learn/collect.py` | every 3 h | Logs Mt. Bachelor's own sensors (temperature, wind, West Village snow depth) to `data/mtb_hourly.csv`, which the resort only keeps for 24 h. Saves a snapshot of every model's forecast to `data/snapshots/`. |
+| `learn/collect.py` | every 3 h | Logs Mt. Bachelor's own sensors (temperature, wind, West Village snow depth) to `data/mtb_hourly.csv`, which the resort only keeps for 24 h. Saves the resort's official 7 am snow report (new snow, overnight, base depth, season total) to `data/observed/resort_snow_report.csv`; the feed only keeps about 10 days. Saves a snapshot of every model's forecast to `data/snapshots/`. |
 | `learn/verify.py` | every 3 h | Saves measured daily snowfall from the SNOTEL gauges to `data/observed/snotel_daily.csv` and West Village daily depth to `data/observed/resort_daily.csv`, then scores every saved forecast snapshot against what actually fell in `data/verification.csv`. |
 | `learn/calibrate.py` | daily | Re-fits corrections from SNOTEL measurements + archived and snapshot forecasts, tests each one on a season it never saw, and writes `calibration.json`. Appends results to `data/score_history.csv`. |
 
@@ -43,6 +43,7 @@ To keep a Mac copy current, `bash snowline/learn/autosync.sh install` pulls at l
 - Open-Meteo forecast, ensemble and previous-runs APIs (GFS, ECMWF, GEM, ICON, NBM). Free for non-commercial use.
 - USDA NRCS SNOTEL AWDB API: Three Creeks Meadow and Irish Taylor are the Bachelor stand-in; McKenzie and Roaring River are used for snow ratios.
 - Mt. Bachelor's public 24-hour weather feed (the one behind mtbachelor.com's live weather page).
+- Mt. Bachelor's official daily snow report feed (the one behind the Mountain Report page's new-snow and base-depth numbers).
 
 ## Caveats
 

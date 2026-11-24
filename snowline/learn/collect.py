@@ -17,6 +17,13 @@ MTB_STATIONS = {  # feed key -> (label, elevation ft)
 MTB_CSV = DATA / "mtb_hourly.csv"
 FIELDS = ["station", "elev_ft", "time_local", "temp_f", "depth_in", "rh", "wind_avg_mph", "wind_dir", "wind_max_mph"]
 
+# Mt. Bachelor's official daily snow report (the numbers on the Mountain Report page). The feed keeps
+# about the last 10 reports, so logging every few hours never misses one.
+REPORT_URL = "https://api.mtbachelor.com/api/v1/dor/drupal/snow-reports"
+REPORT_CSV = DATA / "observed" / "resort_snow_report.csv"
+REPORT_FIELDS = ["report_date", "report_time", "new_24h_in", "overnight_in", "base_depth_in", "new_48h_in",
+                 "new_7day_in", "month_in", "season_total_in", "unit", "updated_utc"]
+
 SNAP_MODELS = ["gfs_seamless", "gfs_global", "ecmwf_ifs025", "gem_seamless", "icon_seamless", "ncep_nbm_conus"]
 
 
@@ -46,6 +53,35 @@ def log_resort():
             w.writeheader()
         w.writerows(sorted(new, key=lambda x: (x["time_local"], x["station"])))
     return len(new)
+
+
+def log_snow_report():
+    rows = {}
+    if REPORT_CSV.exists():
+        with REPORT_CSV.open() as f:
+            rows = {r["report_date"]: r for r in csv.DictReader(f)}
+    added = 0
+    for rep in get_json(REPORT_URL) or []:
+        when = rep.get("date") or ""
+        if len(when) < 10:
+            continue
+        c = rep.get("computed") or {}
+        new = {"report_date": when[:10], "report_time": when[11:16], "new_24h_in": rep.get("amount"),
+               "overnight_in": rep.get("overnight_amount"), "base_depth_in": rep.get("base_depth"),
+               "new_48h_in": c.get("48_hour"), "new_7day_in": c.get("7_day"), "month_in": c.get("month"),
+               "season_total_in": c.get("total"), "unit": rep.get("unit_of_measurement"),
+               "updated_utc": dt.datetime.fromtimestamp(rep["updated"], dt.timezone.utc).strftime("%Y-%m-%dT%H:%M")
+                              if rep.get("updated") else ""}
+        new = {k: ("" if v is None else str(v)) for k, v in new.items()}
+        if rows.get(new["report_date"]) != new:   # new report, or the resort edited one
+            added += new["report_date"] not in rows
+            rows[new["report_date"]] = new
+    REPORT_CSV.parent.mkdir(parents=True, exist_ok=True)
+    with REPORT_CSV.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=REPORT_FIELDS, lineterminator="\n")
+        w.writeheader()
+        w.writerows(sorted(rows.values(), key=lambda r: r["report_date"]))
+    return added
 
 
 def snapshot_forecasts():
@@ -90,6 +126,10 @@ if __name__ == "__main__":
         print("resort sensor rows added:", log_resort())
     except Exception as e:
         ok = False; print("resort sensors failed:", e, file=sys.stderr)
+    try:
+        print("official snow reports added:", log_snow_report())
+    except Exception as e:
+        ok = False; print("official snow report failed:", e, file=sys.stderr)
     try:
         print("forecast snapshot:", snapshot_forecasts())
     except Exception as e:
