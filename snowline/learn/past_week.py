@@ -1,18 +1,17 @@
-"""Builds data/past_week.json: what actually happened at Mt. Bachelor over the last 7 days, next to
-what the models forecast the day before, for the app's "Past week" columns.
+"""Builds data/past_week.json: what actually happened at Mt. Bachelor over the last 7 days, for the
+app's "Past week" columns (Base view). The app fetches the day-before forecast itself, at base elevation.
 
 Each day runs 06:00 -> 06:00 like the app's forecast days, which lines up with the resort's 7 am report
 (the report dated D+1 covers snow that fell on day D). Called at the end of collect.py and verify.py.
 """
-import csv, datetime as dt, json
-from lib import DATA, SNAPSHOTS, today, write_json
+import csv, datetime as dt
+from lib import DATA, today, write_json
 
 OUT = DATA / "past_week.json"
 DAYS = 7
 # App elevation -> resort weather station used for measured temperature and wind.
 # Pine Marten stopped reporting on 2026-11-18, so mid uses Cloud Chaser (same 7,700 ft).
 ELEV_STATION = {"top": "Northwest", "mid": "Cloud Chaser", "base": "West Village"}
-SNAP_MODELS = ["gfs_seamless", "ecmwf_ifs025", "gem_seamless", "icon_seamless", "ncep_nbm_conus"]
 SNOTEL_TARGETS = ["815", "545"]
 
 
@@ -46,20 +45,6 @@ def build():
         day = (t - dt.timedelta(hours=6)).date().isoformat()
         sensors.setdefault((r["station"], day), []).append(r)
 
-    # Forecast made the day before: the newest snapshot issued before midnight starting day D.
-    snaps = sorted(SNAPSHOTS.glob("*.json"))
-    def day_before(d):
-        best = None
-        for p in snaps:
-            if p.stem < d + "T00":
-                best = p
-        if not best:
-            return None
-        s = json.loads(best.read_text())
-        pt = s["points"].get("bachelor_mid", {})
-        models = {m: pt[m][d][:2] for m in SNAP_MODELS if d in pt.get(m, {})}
-        return {"issued": s["issued"], "models": models} if models else None
-
     out = []
     for d in dates:
         nxt = (dt.date.fromisoformat(d) + dt.timedelta(days=1)).isoformat()
@@ -70,7 +55,6 @@ def build():
             "snotel_mm": round(sum(snotel[d]) / len(snotel[d]), 1) if d in snotel else None,
             "stake_change_in": stake.get(d),
             "obs": {},
-            "forecast": day_before(d),
         }
         for ek, st in ELEV_STATION.items():
             rows = sensors.get((st, d), [])

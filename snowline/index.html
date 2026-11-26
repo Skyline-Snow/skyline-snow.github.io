@@ -712,7 +712,8 @@ let lastLayout = null;
 let pastShown = 0;
 function setupPastScroll(keep){
   const sc = $('#outlookScroll'), np = sc ? +sc.dataset.past : 0;
-  if(!np){ pastShown = 0; return }
+  // Leaving the Base view removes the past columns: drop the scroll kept from the wider grid, so the chart starts at Today.
+  if(!np){ if(pastShown && sc) sc.scrollLeft = 0; pastShown = 0; return }
   const og = sc.querySelector('.og'), today = sc.querySelector('[data-today]'), btn = $('#pastBtn'), key = $('#pastKey');
   const rl = sc.querySelector('.rl');
   const todayX = () => today.getBoundingClientRect().left - og.getBoundingClientRect().left - (rl?.offsetWidth || 0);
@@ -790,21 +791,36 @@ function renderTiles(c){
 function num(cm){ const v = U.snowNum(cm); return imp() ? (v < 10 ? v.toFixed(1) : Math.round(v)) : Math.round(v) }
 
 /* Layout 1: Outlook */
-/* Past week, Mt. Bachelor only (data/past_week.json from learn/past_week.py). Snow is the resort's official
-   7 am report (the report dated D+1 covers day D); the ghost bar is the blend of the selected models from the
-   last forecast saved before day D began, at mid mountain. Temperature and wind come from the resort's own
-   station nearest the selected elevation. */
-let PAST = null;
+/* Past week, Mt. Bachelor's Base view only, because the resort measures its snow at the base. Snow is the
+   official 7 am report (data/past_week.json from learn/past_week.py; the report dated D+1 covers day D). The
+   ghost bar is the blend of the selected models' forecast made a day ahead for each hour, at base elevation
+   (Open-Meteo previous-runs API), grouped into the same 06:00 -> 06:00 days as the forecast. */
+let PAST = null, PASTFC = null;
 async function loadPastWeek(){
-  try{ const r = await fetch('data/past_week.json', {cache:'no-store'}); PAST = r.ok ? await r.json() : null }catch(e){ PAST = null }
+  const b = PRESETS[0], models = MODELS.map(m => m.id);
+  const url = `https://previous-runs-api.open-meteo.com/v1/forecast?latitude=${b.lat}&longitude=${b.lon}&elevation=${b.elev.base}` +
+    `&hourly=precipitation_previous_day1,temperature_2m_previous_day1&models=${models.join(',')}&past_days=8&forecast_days=1&timezone=auto`;
+  const [past, fc] = await Promise.all([
+    fetch('data/past_week.json', {cache:'no-store'}).then(r => r.ok ? r.json() : null).catch(() => null),
+    getJSON(url).catch(() => null)]);
+  PAST = past;
+  PASTFC = fc?.hourly ? {time: fc.hourly.time, models: Object.fromEntries(models.map(id =>
+    [id, {p: fc.hourly[`precipitation_previous_day1_${id}`] || [], t: fc.hourly[`temperature_2m_previous_day1_${id}`] || []}]))} : null;
   if(current?.data) render();
 }
+// Day-ahead forecast snow (cm) for one 06:00 -> 06:00 day; null when a model is missing hours.
+function pastForecast(id, date){
+  const m = PASTFC?.models[id]; if(!m) return null;
+  const start = date + 'T06:00', end = addDays(date, 1) + 'T06:00';
+  let snow = 0, n = 0;
+  PASTFC.time.forEach((t, i) => { if(t < start || t >= end || m.p[i] == null || m.t[i] == null) return; snow += splitPrecip(m.p[i], m.t[i])[0]; n++ });
+  return n >= 20 ? snow : null;
+}
 function pastDays(c, firstDate){
-  if(!PAST?.days || current?.r?.id !== 'bachelor' || state.layout !== 'outlook') return [];
+  if(!PAST?.days || current?.r?.id !== 'bachelor' || state.layout !== 'outlook' || state.elev !== 'base') return [];
   return PAST.days.filter(d => d.date < firstDate).slice(-7).map(d => {
-    const fm = d.forecast?.models || {};
-    const use = c.ids.filter(id => fm[id]).length ? c.ids.filter(id => fm[id]) : Object.keys(fm);
-    const fc = use.length ? use.reduce((s, id) => s + splitPrecip(fm[id][0], fm[id][1])[0], 0) / use.length : null;
+    const fcs = c.ids.map(id => pastForecast(id, d.date)).filter(v => v != null);
+    const fc = fcs.length ? fcs.reduce((a, b) => a + b, 0) / fcs.length : null;
     const meas = d.report_in != null ? d.report_in * 2.54 : null;
     // Flag days when the SNOTEL gauges caught far more water than the reported snow could hold (at a generous
     // 10:1). Gauges under-catch snow, so a report above the gauges is normal; the reverse usually means snow
@@ -816,10 +832,10 @@ function pastDays(c, firstDate){
 }
 function pastLabel(date){ const t = new Date(date + 'T12:00:00'); return {wd: t.toLocaleDateString('en-US',{weekday:'short'}), dm: t.toLocaleDateString('en-US',{month:'short', day:'numeric'})} }
 function pastTitle(p){
-  const parts = [p.meas != null ? `Measured ${U.snow(p.meas) === '–' ? 'none' : U.snow(p.meas)} (resort 7 am report)` : 'Resort report not in yet'];
+  const parts = [p.meas != null ? `Measured ${U.snow(p.meas) === '–' ? 'none' : U.snow(p.meas)} (resort 7 am report, at base)` : 'Resort report not in yet'];
   if(p.gauge != null) parts.push(`SNOTEL gauges ${imp() ? (p.gauge/25.4).toFixed(2) + '″' : p.gauge.toFixed(1) + ' mm'} of water`);
   if(p.stake_change_in != null) parts.push(`West Village stake ${p.stake_change_in >= 0 ? '+' : ''}${imp() ? p.stake_change_in.toFixed(1) + '″' : Math.round(p.stake_change_in*2.54) + ' cm'}`);
-  parts.push(p.fc != null ? `Forecast the day before: ${U.snow(p.fc) === '–' ? 'none' : U.snow(p.fc)} (mid mountain)` : 'No saved forecast from the day before');
+  parts.push(p.fc != null ? `Forecast the day before: ${U.snow(p.fc) === '–' ? 'none' : U.snow(p.fc)} (base)` : 'No forecast from the day before');
   if(p.disagree) parts.push('The gauges caught more water than this much snow holds, so one of them is probably off');
   return esc(parts.join(' · '));
 }
@@ -837,7 +853,7 @@ function outlookHTML(c){
   const lowc = i => i >= LOW_CONF_FROM ? ' low' : '';
   const pc = k => 'past' + (k === np - 1 ? ' pend' : '');
   const showTicks = c.ids.length > 1 || c.primKey !== c.ids[0];
-  const pastBar = np ? `<div class="pastbar"><span class="pastkey" id="pastKey" hidden><span><i class="km"></i>Measured (resort 7 am report)</span><span><i class="kf"></i>Forecast the day before</span></span>
+  const pastBar = np ? `<div class="pastbar"><span class="pastkey" id="pastKey" hidden><span><i class="km"></i>Measured at base (7 am report)</span><span><i class="kf"></i>Forecast the day before</span></span>
     <button class="chip" type="button" id="pastBtn" aria-controls="outlookScroll">← Past week</button></div>` : '';
   let html = `<div class="panel"><div class="panel-h"><h2>16-day snowfall · ${ELEV_NAME[ek]} (${U.elev(current.r.elev[ek])})</h2>${pastBar}</div>
     <div class="scrollx${np ? ' haspast' : ''}" id="outlookScroll" data-past="${np}"><div class="og${np ? ' withpast' : ''}" style="--n:${n}">`;
@@ -872,7 +888,7 @@ function outlookHTML(c){
   html += `<div class="rl">Freezing lvl</div>` + past.map((p,k) => pcell(k, '–', 'muted')).join('') + prim.map((d,i)=>{ const fz = d.blocks.filter(Boolean); const v = fz.reduce((a,b)=>a+b.fz,0)/fz.length;
     return `<div class="cell${lowc(i)} ${fzClass(v)}" style="font-size:12px">${U.elevShort(v)}</div>` }).join('');
   html += `</div></div></div>`;
-  html += `<div class="panel cum"><div class="panel-h"><h2>Running total</h2><span class="note">How much snow each model has piled up by each day</span></div><div id="cumWrap"></div></div>`;
+  html += `<div class="panel cum"><div class="panel-h"><h2>Forecast Accumulation</h2></div><div id="cumWrap"></div></div>`;
   return html;
 }
 
