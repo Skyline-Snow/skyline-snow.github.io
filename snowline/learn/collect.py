@@ -134,4 +134,8 @@ if __name__ == "__main__":
         print("forecast snapshot:", snapshot_forecasts())
     except Exception as e:
         ok = False; print("forecast snapshot failed:", e, file=sys.stderr)
+    try:
+        import past_week; print("past week:", past_week.build())
+    except Exception as e:
+        print("past week failed:", e, file=sys.stderr)
     sys.exit(0 if ok else 1)

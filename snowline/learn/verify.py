@@ -139,4 +139,8 @@ if __name__ == "__main__":
     rows = build_verification(snotel)
     print("scored forecasts:", len(rows))
     summary(rows)
+    try:
+        import past_week; print("past week:", past_week.build())
+    except Exception as e:
+        print("past week failed:", e, file=sys.stderr)
     sys.exit(0 if ok else 1)

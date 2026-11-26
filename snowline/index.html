@@ -132,6 +132,22 @@ h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance}
 .whisk::before,.whisk::after{content:"";position:absolute;left:-4px;width:10px;height:2px;background:var(--ink)}
 .whisk::before{top:0}.whisk::after{bottom:0}
 .cell{text-align:center;padding:7px 2px;font-size:13px;border-top:1px solid var(--line)}
+/* Past week (Mt. Bachelor): measured columns to the left of Today. 16 forecast days fill the panel as before. */
+#view .scrollx.haspast{container-type:inline-size}
+.og.withpast{grid-template-columns:76px repeat(var(--n),max(48px,calc((100cqw - 76px) / 16)));min-width:0}
+.og .past{background:color-mix(in oklab,var(--sunk) 55%,transparent)}
+.og .pend{box-shadow:inset -2px 0 0 var(--line)}
+.og .dh.past b{color:var(--muted)}
+.bar.meas{background:color-mix(in oklab,var(--ink) 62%,var(--surface));border-radius:5px 5px 1px 1px}
+.ghost{position:absolute;left:12%;right:12%;bottom:0;border:1.5px dashed var(--snow2);border-bottom:0;border-radius:5px 5px 0 0;pointer-events:none}
+.barv.pending{font-weight:500;font-size:11px;color:var(--muted);font-family:inherit}
+.flag{position:absolute;top:-20px;left:0;right:0;text-align:center;font-size:11px;color:var(--warnwind);cursor:help}
+.pastbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.pastkey{display:inline-flex;gap:12px;font-size:12px;color:var(--muted);align-items:center}
+.pastkey i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.pastkey .km{background:color-mix(in oklab,var(--ink) 62%,var(--surface))}
+.pastkey .kf{border:1.5px dashed var(--snow2)}
+.pastkey[hidden]{display:none}
 .cell .hi{font-weight:600}
 .cell .lo{color:var(--muted)}
 .wind{display:inline-flex;flex-direction:column;align-items:center;gap:1px;line-height:1.1}
@@ -223,7 +239,8 @@ dialog::backdrop{background:rgb(5 10 20 / .45)}
   .panel{padding:12px}
   .og .rl{display:none}
   #view .scrollx{container-type:inline-size}
-  .og{grid-template-columns:repeat(var(--n),calc(100cqw / 7));min-width:0}
+  .og,.og.withpast{grid-template-columns:repeat(var(--n),calc(100cqw / 7));min-width:0}
+  .pastkey{display:none}
   .og .cell{padding:7px 0}
   .plot{margin:24px 2px 0}
   .barv{font-size:12px}
@@ -690,6 +707,29 @@ function compute(data){
 }
 
 let lastLayout = null;
+/* The outlook opens on Today; the past week sits to the left (swipe right / "← Past week" to see it).
+   A re-render keeps the viewer where they were, unless the past columns have only just appeared. */
+let pastShown = 0;
+function setupPastScroll(keep){
+  const sc = $('#outlookScroll'), np = sc ? +sc.dataset.past : 0;
+  if(!np){ pastShown = 0; return }
+  const og = sc.querySelector('.og'), today = sc.querySelector('[data-today]'), btn = $('#pastBtn'), key = $('#pastKey');
+  const rl = sc.querySelector('.rl');
+  const todayX = () => today.getBoundingClientRect().left - og.getBoundingClientRect().left - (rl?.offsetWidth || 0);
+  const snap = pastShown !== np || keep[0] == null;
+  if(snap) sc.scrollLeft = todayX();
+  pastShown = np;
+  // Until the viewer scrolls, keep Today pinned to the left edge as the panel gets its size or is resized
+  // (a page opened in a background tab lays out with zero width at first).
+  let moved = !snap && sc.scrollLeft < todayX() - 4;
+  ['pointerdown','wheel','touchstart','keydown'].forEach(ev => sc.addEventListener(ev, () => { moved = true }, {passive:true}));
+  new ResizeObserver(() => { if(!moved) sc.scrollLeft = todayX() }).observe(sc);
+  const sync = () => { const inPast = sc.scrollLeft < todayX() - today.offsetWidth / 2;
+    btn.textContent = inPast ? 'Today →' : '← Past week'; key.hidden = !inPast };
+  sync();
+  sc.addEventListener('scroll', sync, {passive:true});
+  btn.addEventListener('click', () => { moved = true; sc.scrollTo({left: sc.scrollLeft < todayX() - 4 ? todayX() : 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'}) });
+}
 function render(){
   renderChrome();
   if(!current?.data){ return }
@@ -707,6 +747,7 @@ function render(){
   else v.innerHTML = elevationsHTML(c);
   v.querySelector('.panel')?.insertAdjacentHTML('beforeend', modelBarHTML(current.data, c));
   v.querySelectorAll('.scrollx').forEach((e, i) => { if(keep[i]) e.scrollLeft = keep[i] });
+  setupPastScroll(keep);
   if(state.layout === 'outlook') drawCumulative(c);
   const t = new Date(current.data.at);
   $('#updated').innerHTML = `Model data fetched ${t.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}<br>${c.primKey==='blend' ? `Blend of ${c.ids.map(id=>modelById(id).name).join(', ')}` : modelById(c.primKey).name}`;
@@ -749,22 +790,67 @@ function renderTiles(c){
 function num(cm){ const v = U.snowNum(cm); return imp() ? (v < 10 ? v.toFixed(1) : Math.round(v)) : Math.round(v) }
 
 /* Layout 1: Outlook */
+/* Past week, Mt. Bachelor only (data/past_week.json from learn/past_week.py). Snow is the resort's official
+   7 am report (the report dated D+1 covers day D); the ghost bar is the blend of the selected models from the
+   last forecast saved before day D began, at mid mountain. Temperature and wind come from the resort's own
+   station nearest the selected elevation. */
+let PAST = null;
+async function loadPastWeek(){
+  try{ const r = await fetch('data/past_week.json', {cache:'no-store'}); PAST = r.ok ? await r.json() : null }catch(e){ PAST = null }
+  if(current?.data) render();
+}
+function pastDays(c, firstDate){
+  if(!PAST?.days || current?.r?.id !== 'bachelor' || state.layout !== 'outlook') return [];
+  return PAST.days.filter(d => d.date < firstDate).slice(-7).map(d => {
+    const fm = d.forecast?.models || {};
+    const use = c.ids.filter(id => fm[id]).length ? c.ids.filter(id => fm[id]) : Object.keys(fm);
+    const fc = use.length ? use.reduce((s, id) => s + splitPrecip(fm[id][0], fm[id][1])[0], 0) / use.length : null;
+    const meas = d.report_in != null ? d.report_in * 2.54 : null;
+    // Flag days when the SNOTEL gauges caught far more water than the reported snow could hold (at a generous
+    // 10:1). Gauges under-catch snow, so a report above the gauges is normal; the reverse usually means snow
+    // that capped a gauge melting in later, or rain.
+    const gauge = d.snotel_mm != null ? d.snotel_mm : null, gaugeIn = gauge != null ? gauge * 10 / 25.4 : null;
+    const disagree = meas != null && gaugeIn != null && gaugeIn >= d.report_in + 1.5 && gaugeIn >= 2 * d.report_in;
+    return {...d, meas, fc, gauge, disagree, o: d.obs?.[state.elev] || null};
+  });
+}
+function pastLabel(date){ const t = new Date(date + 'T12:00:00'); return {wd: t.toLocaleDateString('en-US',{weekday:'short'}), dm: t.toLocaleDateString('en-US',{month:'short', day:'numeric'})} }
+function pastTitle(p){
+  const parts = [p.meas != null ? `Measured ${U.snow(p.meas) === '–' ? 'none' : U.snow(p.meas)} (resort 7 am report)` : 'Resort report not in yet'];
+  if(p.gauge != null) parts.push(`SNOTEL gauges ${imp() ? (p.gauge/25.4).toFixed(2) + '″' : p.gauge.toFixed(1) + ' mm'} of water`);
+  if(p.stake_change_in != null) parts.push(`West Village stake ${p.stake_change_in >= 0 ? '+' : ''}${imp() ? p.stake_change_in.toFixed(1) + '″' : Math.round(p.stake_change_in*2.54) + ' cm'}`);
+  parts.push(p.fc != null ? `Forecast the day before: ${U.snow(p.fc) === '–' ? 'none' : U.snow(p.fc)} (mid mountain)` : 'No saved forecast from the day before');
+  if(p.disagree) parts.push('The gauges caught more water than this much snow holds, so one of them is probably off');
+  return esc(parts.join(' · '));
+}
+
 function outlookHTML(c){
-  const ek = state.elev, prim = c.per[ek][c.primKey], n = prim.length;
+  const ek = state.elev, prim = c.per[ek][c.primKey];
+  const past = pastDays(c, prim[0]?.date || '9999'), np = past.length, n = prim.length + np;
   const ens = current.ens;
   let max = 0;
   prim.forEach(d => { max = Math.max(max, d.snow); c.ids.forEach(id => { const x = c.per[ek][id][prim.indexOf(d)]; if(x) max = Math.max(max, x.snow) });
     if(ens?.days[d.date]) max = Math.max(max, ens.days[d.date].p90) });
+  past.forEach(p => { max = Math.max(max, p.meas || 0, p.fc || 0) });
   max = Math.max(max * 1.12, imp() ? 10*2.54 : 20);
   const h = v => clamp(v / max * 100, 0, 100);
   const lowc = i => i >= LOW_CONF_FROM ? ' low' : '';
+  const pc = k => 'past' + (k === np - 1 ? ' pend' : '');
   const showTicks = c.ids.length > 1 || c.primKey !== c.ids[0];
-  let html = `<div class="panel"><div class="panel-h"><h2>16-day snowfall · ${ELEV_NAME[ek]} (${U.elev(current.r.elev[ek])})</h2></div>
-    <div class="scrollx"><div class="og" style="--n:${n}">`;
+  const pastBar = np ? `<div class="pastbar"><span class="pastkey" id="pastKey" hidden><span><i class="km"></i>Measured (resort 7 am report)</span><span><i class="kf"></i>Forecast the day before</span></span>
+    <button class="chip" type="button" id="pastBtn" aria-controls="outlookScroll">← Past week</button></div>` : '';
+  let html = `<div class="panel"><div class="panel-h"><h2>16-day snowfall · ${ELEV_NAME[ek]} (${U.elev(current.r.elev[ek])})</h2>${pastBar}</div>
+    <div class="scrollx${np ? ' haspast' : ''}" id="outlookScroll" data-past="${np}"><div class="og${np ? ' withpast' : ''}" style="--n:${n}">`;
   // header
-  html += `<div class="rl"></div>` + prim.map((d,i) => { const l = dayLabel(d.date, i); return `<div class="dh${lowc(i)}"><b>${l.wd}</b>${l.dm}</div>` }).join('');
+  html += `<div class="rl"></div>` + past.map((p,k) => { const l = pastLabel(p.date); return `<div class="dh ${pc(k)}"${k===0?' data-past-start':''}><b>${l.wd}</b>${l.dm}</div>` }).join('')
+    + prim.map((d,i) => { const l = dayLabel(d.date, i); return `<div class="dh${lowc(i)}"${i===0?' data-today':''}><b>${l.wd}</b>${l.dm}</div>` }).join('');
   // bars
-  html += `<div class="rl">Snow</div>` + prim.map((d,i) => {
+  html += `<div class="rl">Snow</div>` + past.map((p,k) => {
+    const ghost = p.fc != null && p.fc >= 0.2 ? `<div class="ghost" style="height:${h(p.fc)}%"></div>` : '';
+    const top = Math.max(h(p.meas || 0), p.fc != null ? h(p.fc) : 0);
+    const val = p.meas != null ? `<div class="barv" style="bottom:calc(${top}% + 6px)">${U.snow(p.meas)}</div>` : `<div class="barv pending" style="bottom:calc(${top}% + 6px)">7 am</div>`;
+    return `<div class="${pc(k)}" title="${pastTitle(p)}"><div class="plot">${p.disagree ? '<div class="flag">⚠ check</div>' : ''}<div class="bar meas" style="height:${h(p.meas || 0)}%"></div>${ghost}${val}</div></div>`;
+  }).join('') + prim.map((d,i) => {
     const e = ens?.days[d.date];
     const ticks = showTicks ? c.ids.map((id, k) => { const x = c.per[ek][id][i]; if(!x) return '';
       const left = 22 + (56 * (c.ids.length===1 ? .5 : k/(c.ids.length-1)));
@@ -775,13 +861,15 @@ function outlookHTML(c){
       <div class="barv" style="bottom:calc(${top}% + 6px)">${U.snow(d.snow)}</div></div></div>`;
   }).join('');
   // rain
-  html += `<div class="rl">Rain</div>` + prim.map((d,i)=>`<div class="cell${lowc(i)}"><span class="rainv">${U.rain(d.rain) || '&nbsp;'}</span></div>`).join('');
+  const pcell = (k, inner, extra='') => `<div class="cell ${pc(k)} ${extra}">${inner}</div>`;
+  const fToC = f => f == null ? null : (f - 32) * 5/9;
+  html += `<div class="rl">Rain</div>` + past.map((p,k) => pcell(k, '&nbsp;')).join('') + prim.map((d,i)=>`<div class="cell${lowc(i)}"><span class="rainv">${U.rain(d.rain) || '&nbsp;'}</span></div>`).join('');
   // temps
-  html += `<div class="rl">High / Low</div>` + prim.map((d,i)=>`<div class="cell${lowc(i)}"><div class="hi" style="color:${tempColor(d.tmax)}">${U.temp(d.tmax)}</div><div class="lo">${U.temp(d.tmin)}</div></div>`).join('');
+  html += `<div class="rl">High / Low</div>` + past.map((p,k) => pcell(k, p.o ? `<div class="hi" style="color:${tempColor(fToC(p.o.tmax_f))}" title="Measured at ${esc(p.o.station)}">${U.temp(fToC(p.o.tmax_f))}</div><div class="lo">${U.temp(fToC(p.o.tmin_f))}</div>` : '<span class="muted">–</span>')).join('') + prim.map((d,i)=>`<div class="cell${lowc(i)}"><div class="hi" style="color:${tempColor(d.tmax)}">${U.temp(d.tmax)}</div><div class="lo">${U.temp(d.tmin)}</div></div>`).join('');
   // wind
-  html += `<div class="rl">Wind ${U.windUnit()}</div>` + prim.map((d,i)=>`<div class="cell${lowc(i)}">${windHTML(d.wind, d.dir)}</div>`).join('');
+  html += `<div class="rl">Wind ${U.windUnit()}</div>` + past.map((p,k) => pcell(k, p.o?.wind_mph != null ? windHTML(p.o.wind_mph * 1.609, p.o.dir) : '<span class="muted">–</span>')).join('') + prim.map((d,i)=>`<div class="cell${lowc(i)}">${windHTML(d.wind, d.dir)}</div>`).join('');
   // freezing level
-  html += `<div class="rl">Freezing lvl</div>` + prim.map((d,i)=>{ const fz = d.blocks.filter(Boolean); const v = fz.reduce((a,b)=>a+b.fz,0)/fz.length;
+  html += `<div class="rl">Freezing lvl</div>` + past.map((p,k) => pcell(k, '–', 'muted')).join('') + prim.map((d,i)=>{ const fz = d.blocks.filter(Boolean); const v = fz.reduce((a,b)=>a+b.fz,0)/fz.length;
     return `<div class="cell${lowc(i)} ${fzClass(v)}" style="font-size:12px">${U.elevShort(v)}</div>` }).join('');
   html += `</div></div></div>`;
   html += `<div class="panel cum"><div class="panel-h"><h2>Running total</h2><span class="note">How much snow each model has piled up by each day</span></div><div id="cumWrap"></div></div>`;
@@ -929,7 +1017,7 @@ document.querySelectorAll('[data-units]').forEach(b => b.addEventListener('click
 document.querySelectorAll('[data-elev]').forEach(b => b.addEventListener('click', () => { state.elev = b.dataset.elev; save(); current.ens = null; render(); loadEnsemble() }));
 document.querySelectorAll('[data-layout]').forEach(b => b.addEventListener('click', () => { state.layout = b.dataset.layout; save(); render(); window.scrollTo({top: 0}) }));
 $('#ensToggle').addEventListener('change', e => { state.ensemble = e.target.checked; save(); if(!state.ensemble){ current.ens = null; render() } else loadEnsemble() });
-$('#refreshBtn').addEventListener('click', () => { cache.ens = {}; load(true); loadCalibration(); loadResortLog() });
+$('#refreshBtn').addEventListener('click', () => { cache.ens = {}; load(true); loadCalibration(); loadResortLog(); loadPastWeek() });
 $('#calToggle').addEventListener('change', e => { state.calibrated = e.target.checked; save(); current.ens = null; render(); renderCalPanel(); loadEnsemble() });
 
 /* ---------- calibration + resort sensor log (files written by the learn/ scripts) ---------- */
@@ -1049,6 +1137,7 @@ $('#addForm').addEventListener('submit', e => {
 
 loadCalibration();
 loadResortLog();
+loadPastWeek();
 load();
 
 /* Browsers (and iPhone home-screen apps) can keep showing an old copy of this page. When a newer
