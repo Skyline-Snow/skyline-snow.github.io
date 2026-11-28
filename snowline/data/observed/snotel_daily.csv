@@ -195,3 +195,7 @@ date,station_id,station,prec_total_in,new_water_mm,swe_in,depth_in,tavg_f
 2026-11-26,619,Mckenzie,8.4,55.9,0.8,1,40.6
 2026-11-26,719,Roaring River,6.5,45.7,0.0,0,40.6
 2026-11-26,815,Three Creeks Meadow,4.2,50.8,0.4,0,40.6
+2026-11-27,545,Irish Taylor,7.2,61.0,0.7,1,41.9
+2026-11-27,619,Mckenzie,10.5,53.3,0.5,1,42.1
+2026-11-27,719,Roaring River,8.7,55.9,0.0,0,43.2
+2026-11-27,815,Three Creeks Meadow,5.6,35.6,0.3,0,42.3
